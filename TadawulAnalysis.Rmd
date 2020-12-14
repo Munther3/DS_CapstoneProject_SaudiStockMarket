@@ -1,0 +1,303 @@
+---
+title: "Tadawul Future Prediction"
+output: html_notebook
+auther: "Munther Alnghenshi"
+data: 12/15/2020
+---
+ 
+```{r}
+if(!require(quantmod)) install.packages("quantmod")
+if(!require(forecast)) install.packages("forecast")
+if(!require(tseries)) install.packages("tseries")
+if(!require(timeSeries)) install.packages("timeSeries")
+if(!require(dplyr)) install.packages("dplyr")
+if(!require(fGarch)) install.packages("fGarch")
+if(!require(prophet)) install.packages("prophet")
+library(prophet)
+library(quantmod)
+library(forecast)
+library(tseries)
+library(timeSeries)
+library(dplyr)
+library(fGarch)
+library(ggplot2)
+```
+
+## Overview:
+* For this project I will start with a general idea of the market price, including dataset analysis. Followed by a general description and analysis of the dataset. The objective is to apply different forecasting predictive models for the Saudi stock market daily close price. The models will be evaluated, analysed and compared, following the main course project directions. For this evaluations I will focus in the train set accuracy performance of the models, trying to simplify our analysis due to our aim is showing new forecasting applications and encourage the open source use of them. 
+
+* This report describes different time series and machine learning forecasting models applied to a Sadui stock market (Tadawuel) close price for he past 10 years, up untill the the end of last month data.  The data will be divided 70/30. I will divie into analyzing the first 7 years of the data going from 2010 - 2017, and leave the last 3 years (2017-2020) to compare the out come.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+Stock <- read.csv("Tadawulmarket.csv")
+
+head(Stock) #show the head
+
+```
+
+
+## Data Cleaning 
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+
+
+dates <-  Stock$ï..Date #save the data column
+dates <-  as.Date(dates, format = '%d/%m/%Y') #convert the date format 
+values <- Stock$Price #saveing the closing prices
+values <- as.factor(values) #convert the closing prices format to factors 
+
+## train and test dates and values:
+N = length(dates)
+n = 0.7*N
+traindates = dates[1:n]
+testdates  = dates[(n+1):N]
+trainvalues= values[1:n]
+testvalues = values[(n+1):N]
+
+Stock[is.na(Stock)] <- 0 #assinging all NAs to ZERO if NA exists 
+
+close_price <- ts(ds[,2],start=2010,end =c(2020,11),frequency=12) #The ts() function will convert a numeric vector into an R time series object. 
+close_price_Train <- ts(ds[,2],start=2010,end =c(2017,11),frequency=12)  #data for first 7 years 
+close_price_Test <- ts(ds[,2],start=c(2017,12),end =c(2020,11),frequency=12) #last 3 years
+
+```
+
+
+## Methods:
+
+
+#### Preliminary Analysis: 
+
+
+```{r}
+autoplot(close_price_Train)+
+  ggtitle("The closing price of TADAWUL")
+  ylab("Traded in Saudi Riyal")
+```
+
+* There is no apparent trend in the data over this period 
+
+* Taking the first difference of the data to remove the trend, if there is. 
+
+```{r}
+DY <- diff(close_price_Train) 
+ggseasonplot(DY)+
+  ggtitle("The closing price of TADAWUL")
+  ylab("Traded in Saudi Riyal")
+```
+* The above plot shows that the data does not have seasonality
+
+
+
+
+#### Arima: Autoregresive Integrating Moving Average:
+ 
+1. We denote this forecasting model by ARIMA( p, d, q).
+2.In ARIMA, p denotes the number of autoregressive terms, d denotes the number of times that the set should be differenciated for making it stationary. The last parameter q denotes the number of inve
+
+
+* First we conduct an ADF test for the close price set:
+```{r}
+# Conduct ADF test for dataset
+print(adf.test(close_price_Train))
+
+```
+
+* In statistics and econometrics, an augmented Dickey–Fuller test (ADF) tests the null hypothesis that a unit root is present in a time series sample.
+
+* In general, a p-value of less than 5% means you can reject the null hypothesis that there is a unit root. You can also compare the calculated DFT statistic with a tabulated critical value. Since p-value = 0.3767 (greater than 5%) --> we cannot reject the null hypothesis)
+
+
+* After the ADF test we apply the ACF and PACF functions to the dataset:
+
+```{r}
+acf(close_price_Train) #The correlation between the observation at the current time spot and the observations at previous time spots. 
+
+pacfPlot(close_price_Train)
+#https://www.youtube.com/watch?v=Icl9_46_RZY&pbjreload=101
+```
+* For identifying the (p) order of the AR model we use the PACF plot. For MA models we will use ACF plot to identify the (q) order and the PACF will dampen exponentially. If we look the PACF plot, we can note that the it has a significant spike only at first lags, meaning that all the higher-order autocorrelations are effectively explained by the first lag autocorrelation. 
+
+```{r}
+#We apply auto arima to the dataset 
+modelfit <- auto.arima(close_price_Train, lambda = "auto")
+
+checkresiduals(modelfit)
+```
+
+
+
+
+* The residuals are equal to the difference between the observations and the corresponding fitted values
+
+
+*-H0: The dataset points are independently distributed.
+
+*With this null hypothesis, a significant p-value greater than 0.05 does not rejects the fact that the dataset points are not correlated.
+
+```{r}
+#Box test for lag=2
+Box.test(modelfit$residuals, lag= 2, type="Ljung-Box")
+```
+
+
+```{r}
+#Box test for lag=2
+Box.test(modelfit$residuals, type="Ljung-Box")
+```
+
+#### Arima Results:
+
+* As we can see, the AUTO-ARIMA selects the best model parameters, giving us a very good estimation.
+
+* I focus on forecasting the close stock price for the next 3 years so that I can compare the outcome with the test data, which has the data for the targeted period by the model 
+
+```{r}
+#Dataset forecasting for the next 3 years
+
+price_forecast <- forecast(modelfit, h=36) #unit time = 1 month 
+accuracy(price_forecast,close_price_Test) #testing the accuracy of ARIMA 
+```
+
+* Forecasting the close market price.
+
+* The blue line that represents the mean of our prediction for nest 3 years.
+
+* We can see plotting the test data (2017-2020) the outcome of the forecast is 
+
+```{r}
+#Dataset forecasting plot for the next 365 days
+plot(price_forecast)
+autoplot(close_price_Test)+ #test the future 3 years
+  ggtitle("The closing price of TADAWUL")
+  ylab("Traded in Saudi Riyal")
+```
+
+* The darker and light darker areas, representing 80% and 95% confidence intervals respectively in lower and upper scenarios.
+```{r}
+#Dataset forecast lower first 5 values AND upper
+head(price_forecast$lower)
+head(price_forecast$upper)
+
+```
+```{r}
+#Dividing the data into train and test, applying the model
+N = length(close_price)
+n = 0.7*N
+train = close_price[1:n]
+test  = close_price[(n+1):N]
+trainarimafit <- auto.arima(train, lambda = "auto")
+predlen=length(test)
+trainarimafit <- forecast(trainarimafit, h=predlen)
+accuracy(trainarimafit,test)
+```
+
+
+```{r}
+#Plotting mean predicted values vs real data
+meanvalues <- as.vector(trainarimafit$mean)
+precios <- as.vector(test)
+plot(meanvalues, type= "l", col= "red")
+lines(precios, type = "l")
+```
+
+
+
+* In the red line we see our mean forecasting prediction tendency over the real close price of the market. The tendency shows a good approach predicting the future direction of the close price.
+
+ 
+
+
+ 
+
+## Prophet:
+* The origin of prophet comes from the application of a forecasting model into supply chain management, sales and economics. This model helps with a statistical approach in shaping business decisions.The Prophet model has been developed by Facebook’s Core Data Science team and it is an open-source tool for business forecasting.
+\
+\
+\
+*Prophet forecast flow:
+\
+
+$y(t)=g(t)+s(t)+h(t)+ϵ$
+
+\
+* The Prophet model is an additive model with the components g(t) models trends, s(t) models seasonality with Fourier series, h(t) effects of holidays or large events.
+\
+\
+\
+
+* The fist step before forecasting using prophet is to convert the dataset into the format that Prophet input requires.
+```{r}
+ 
+proph <- data.frame(ds = dates, #adding the two columns of dates and prices to a data
+                 y = values)
+proph
+model1 <- prophet(proph) #Once we have converted the data we can proceed to apply the model with the dataset and predict future values.
+
+future <- make_future_dataframe(prophetpred, periods = 365*3) # predicting a year 
+forecast_prophet <- predict(prophetpred, future)
+dyplot.prophet(model1,forecast_prophet)
+```
+
+
+* With the model applied and the forecast plotted we proceed to calculate the model performance.
+```{r}
+#Creating train prediction datset to compare the real data
+dataprediction <- data.frame(forecast_prophet$ds,forecast_prophet$yhat)
+trainlen <- length(close_price)
+dataprediction <- dataprediction[c(1:trainlen),]
+#Once we have created our dataset to compare the real data against the predicted values y hat we proceed to calculate de accuracy.
+```
+```{r}
+#Creating cross validation 
+accuracy(dataprediction$forecast_prophet.y,model1$y)
+#Creating cross validation 
+prophet_plot_components(model1,forecast_prophet)
+```
+
+
+## Feed Foward Neural network
+
+* Researching deeply in new machine learning models I have reached some new neural network function in the forecast package called nneta
+
+* A single hidden layer neural network is the most simple neural networks form. In this single hidden layer form there is only one layer of input nodes that send weighted inputs to a subsequent layer of receiving nodes. This nnetar function in the forecast package fits a single hidden layer neural network model to a timeseries. The function model approach is to use lagged values of the time series as input data, reaching to a non-linear autoregressive model.
+
+
+```{r}
+#Hidden layers creation
+
+#With the hidden layers approach explained we proceed to calculate them:
+
+alpha <- 1.5^(-10)
+hn <- length(close_price)/(alpha*(length(close_price)+30))
+```
+
+* with the hidden layers calculated we proceed to apply the nnetar function with the parameters selected.
+
+```{r}
+#Fitting nnetar
+
+#
+lambda <- BoxCox.lambda(close_price)
+dnn_pred <- nnetar(close_price_Train, size= hn, lambda = lambda)
+```
+
+
+
+
+```{r}
+#Fitting nnetar
+dnn_forecast <- forecast(dnn_pred, h= 36, PI = TRUE) #forcast from 2017-2020 
+plot(dnn_forecast)
+```
+
+```{r}
+accuracy(dnn_forecast,close_price_Test)
+```
+
+
+
+## Conclusion:
+* In this study I focused in the application of different models, learning how to use them with the objective to forecast new price values. As we can see from the results, the models performed with similar future tendency predictions. All the models predicted a tendency of a lower price in next 3 years. We can conclude that the ARIMA and prophet performed very well inside the prediction intervals and the accuracy metrics. The Neural Net models model did not performed as well as ARIMA or prophet models. Maybe it needed more tuning for getting more accurated results.
