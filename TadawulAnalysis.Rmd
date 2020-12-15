@@ -30,7 +30,7 @@ library(ggplot2)
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
-Stock <- read.csv("Tadawulmarket.csv")
+Stock <- read.csv("TadawulAnalysis.csv")
 
 head(Stock) #show the head
 
@@ -55,6 +55,11 @@ traindates = dates[1:n]
 testdates  = dates[(n+1):N]
 trainvalues= values[1:n]
 testvalues = values[(n+1):N]
+
+ds <- Stock %>% 
+
+  mutate_if(is.character, as.factor)
+
 
 Stock[is.na(Stock)] <- 0 #assinging all NAs to ZERO if NA exists 
 
@@ -144,7 +149,7 @@ Box.test(modelfit$residuals, lag= 2, type="Ljung-Box")
 
 
 ```{r}
-#Box test for lag=2
+#Box test 
 Box.test(modelfit$residuals, type="Ljung-Box")
 ```
 
@@ -230,14 +235,15 @@ $y(t)=g(t)+s(t)+h(t)+ϵ$
 
 * The fist step before forecasting using prophet is to convert the dataset into the format that Prophet input requires.
 ```{r}
- 
-proph <- data.frame(ds = dates, #adding the two columns of dates and prices to a data
-                 y = values)
+N = length(dates)
+n = 0.3*N
+proph <- data.frame(ds = dates[(n+1):N], #adding the two columns of dates and prices to a data
+                 y = values[(n+1):N])
 proph
 model1 <- prophet(proph) #Once we have converted the data we can proceed to apply the model with the dataset and predict future values.
 
-future <- make_future_dataframe(prophetpred, periods = 365*3) # predicting a year 
-forecast_prophet <- predict(prophetpred, future)
+future <- make_future_dataframe(model1, periods = 365*3) # predicting a year 
+forecast_prophet <- predict(model1, future)
 dyplot.prophet(model1,forecast_prophet)
 ```
 
