@@ -13,6 +13,12 @@ if(!require(timeSeries)) install.packages("timeSeries")
 if(!require(dplyr)) install.packages("dplyr")
 if(!require(fGarch)) install.packages("fGarch")
 if(!require(prophet)) install.packages("prophet")
+if(!require(fUnitRoots)) install.packages("fUnitRoots")
+if(!require(FitAR)) install.packages("FitAR")
+if(!require(forecast)) install.packages("forecast")
+library(FitAR)
+library(forecast)
+ 
 library(prophet)
 library(quantmod)
 library(forecast)
@@ -26,18 +32,25 @@ library(ggplot2)
 ## Overview:
 * For this project I will start with a general idea of the market price, including dataset analysis. Followed by a general description and analysis of the dataset. The objective is to apply different forecasting predictive models for the Saudi stock market daily close price. The models will be evaluated, analysed and compared, following the main course project directions. For this evaluations I will focus in the train set accuracy performance of the models, trying to simplify our analysis due to our aim is showing new forecasting applications and encourage the open source use of them. 
 
-* This report describes different time series and machine learning forecasting models applied to a Sadui stock market (Tadawuel) close price for he past 10 years, up untill the the end of last month data.  The data will be divided 70/30. I will divie into analyzing the first 7 years of the data going from 2010 - 2017, and leave the last 3 years (2017-2020) to compare the out come.
+* This report describes different time series and machine learning forecasting models applied to a Sadui stock market (Tadawuel) close price for he past 10 years, up untill the the end of last month data.  The data will be divided 70/30. I will divide into analyzing the first 7 years of the data going from 2010 - 2017, and leave the last 3 years (2017-2020) to compare the out come.
+
+
+##### Displaying the head of the data
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
 Stock <- read.csv("TadawulAnalysis.csv")
 
 head(Stock) #show the head
-
 ```
 
 
+
+
 ## Data Cleaning 
+* Dividing the data into  the first 7 years of the data going from 2010 - 2017, and leave the last 3 years (2017-2020) to compare the out come. The data will be divided 70/30.
+
+
 
 ```{r, echo=FALSE, warning=FALSE, message=FALSE}
 
@@ -62,96 +75,152 @@ ds <- Stock %>%
 
 
 Stock[is.na(Stock)] <- 0 #assinging all NAs to ZERO if NA exists 
+```
+
+
+*Converting the data into time series data format. To do so we need to run the following command in R:
+
+
+```{r}
 
 close_price <- ts(ds[,2],start=2010,end =c(2020,11),frequency=12) #The ts() function will convert a numeric vector into an R time series object. 
+head(close_price)
 close_price_Train <- ts(ds[,2],start=2010,end =c(2017,11),frequency=12)  #data for first 7 years 
 close_price_Test <- ts(ds[,2],start=c(2017,12),end =c(2020,11),frequency=12) #last 3 years
-
+close_price_Train
 ```
+
+
+*Where close_price is the univariate data which we are converting to time series. start gives the starting time of the data, in this case, its 2010 As it is a monthly data so ‘frequency=12’.
 
 
 ## Methods:
 
+### ARIMA
 
 #### Preliminary Analysis: 
 
-
+* This is how the actual dataset looks like:
 ```{r}
 autoplot(close_price_Train)+
   ggtitle("The closing price of TADAWUL")
   ylab("Traded in Saudi Riyal")
 ```
 
-* There is no apparent trend in the data over this period 
+* We can infer from the graph itself that the data points follows an overall downward trend with some outliers in terms of sudden higher values. Now we need to do some analysis to find out the exact non-stationary and seasonality in the data.
 
-* Taking the first difference of the data to remove the trend, if there is. 
 
+
+
+#### Exploratory analysis
+1. Autocorrelation analysis to examine serial dependence: Used to estimate which value in the past has a correlation with the current value. Provides the p,d,q estimate for ARIMA models.
+
+2. Spectral analysis to examine cyclic behavior: Carried out to describe how variation in a time series may be accounted for by cyclic components. Also referred to as a Frequency Domain analysis. Using this, periodic components in a noisy environment can be separated out.
+
+3. Trend estimation and decomposition: Used for seasonal adjustment. It seeks to construct, from an observed time series, a number of component series(that could be used to reconstruct the original series) where each of these has a certain characteristic.
+
+
+*First, We need to understand the three components of a time series data:
+
+1. Trend: A long-term change in the data is referred to as a trend. 
+
+2. Seasonal: When a series is affected by some seasonal factors.
+
+3. Cyclic: When data exhibit rises and falls that are not seasonal
+
+*We can use the following R code to find out the components of this time series:
 ```{r}
-DY <- diff(close_price_Train) 
-ggseasonplot(DY)+
-  ggtitle("The closing price of TADAWUL")
-  ylab("Traded in Saudi Riyal")
+components.ts = decompose(close_price_Train)
+plot(components.ts)
 ```
-* The above plot shows that the data does not have seasonality
 
+*we get 4 components:
 
+1. Observed – the actual data plot
+2. Trend – the overall upward or downward movement of the data 
+3. Seasonal – any seasonal pattern of the data 
+4. Random – random part of the data
 
+Next, we need to remove non-stationary part for ARIMA.
 
-#### Arima: Autoregresive Integrating Moving Average:
+*To achieve stationarity:
+
+1. Difference the data – compute the differences between consecutive observations
  
-1. We denote this forecasting model by ARIMA( p, d, q).
-2.In ARIMA, p denotes the number of autoregressive terms, d denotes the number of times that the set should be differenciated for making it stationary. The last parameter q denotes the number of inve
 
-
-* First we conduct an ADF test for the close price set:
-```{r}
-# Conduct ADF test for dataset
-print(adf.test(close_price_Train))
-
-```
-
-* In statistics and econometrics, an augmented Dickey–Fuller test (ADF) tests the null hypothesis that a unit root is present in a time series sample.
-
-* In general, a p-value of less than 5% means you can reject the null hypothesis that there is a unit root. You can also compare the calculated DFT statistic with a tabulated critical value. Since p-value = 0.3767 (greater than 5%) --> we cannot reject the null hypothesis)
-
-
-* After the ADF test we apply the ACF and PACF functions to the dataset:
 
 ```{r}
-acf(close_price_Train) #The correlation between the observation at the current time spot and the observations at previous time spots. 
 
-pacfPlot(close_price_Train)
-#https://www.youtube.com/watch?v=Icl9_46_RZY&pbjreload=101
+tsstationary = diff(close_price_Train, differences=1) #Returns suitably lagged and iterated differences.
+# the order of the difference = 1
+plot(tsstationary)
+#The closing price of TADAWUL vsTraded in Saudi Riyal
 ```
-* For identifying the (p) order of the AR model we use the PACF plot. For MA models we will use ACF plot to identify the (q) order and the PACF will dampen exponentially. If we look the PACF plot, we can note that the it has a significant spike only at first lags, meaning that all the higher-order autocorrelations are effectively explained by the first lag autocorrelation. 
+
+* To remove seasonality from the data, we subtract the seasonal component from the original series and then difference it to make it stationary.
+
+* After removing seasonality and making the data stationary, it will look like:
 
 ```{r}
-#We apply auto arima to the dataset 
-modelfit <- auto.arima(close_price_Train, lambda = "auto")
-
-checkresiduals(modelfit)
+seasonality <- close_price_Train - components.ts$seasonal #we subtract the seasonal component from the original series
+tsstationary <- diff(seasonality, differences=1) # difference it to make it stationary.
+plot(tsstationary)
 ```
 
-
-
-
-* The residuals are equal to the difference between the observations and the corresponding fitted values
-
-
-*-H0: The dataset points are independently distributed.
-
-*With this null hypothesis, a significant p-value greater than 0.05 does not rejects the fact that the dataset points are not correlated.
-
-```{r}
-#Box test for lag=2
-Box.test(modelfit$residuals, lag= 2, type="Ljung-Box")
-```
 
 
 ```{r}
 #Box test 
 Box.test(modelfit$residuals, type="Ljung-Box")
 ```
+
+
+
+
+
+#### Fit the Arima model
+ 
+1. We denote this forecasting model by ARIMA( p, d, q).
+2.In ARIMA, p denotes the number of autoregressive terms, d denotes the number of times that the set should be differenciated for making it stationary. The last parameter q denotes the number of inve
+
+
+* First we conduct an ADF, and PACF tests for the close price set:
+```{r}
+# Conduct ADF test for dataset
+acf(tsstationary, lag.max=34) #The correlation between the observation at the current time spot and the observations at previous time spots. 
+
+pacf(tsstationary, lag.max=34)
+```
+
+ 
+* The autocorrelation function (acf()) gives the autocorrelation at all possible lags 
+
+* PACF() helps to identify the number of autoregression (AR) coefficients(p-value) in an ARIMA model.
+ 
+  
+ 
+ 
+ 
+#### AUTO.ARIMA fitting 
+
+1. To better find the values of p,d,q we use the function auto.arima()
+
+2. The auto.arima() function in R uses a combination of unit root tests, minimization of the AIC and MLE to obtain an ARIMA model.
+
+3. What is AIC? Akaike's Information Criterion (AIC), which was useful in selecting predictors for regression, is also useful for determining the order of an ARIMA model.
+
+4. The p,d, and q are then chosen by least value of AIC.  
+
+
+
+
+```{r}
+modelfit <- auto.arima(tsstationary, trace=TRUE) 
+```
+ 
+
+ 
+
 
 #### Arima Results:
 
@@ -180,7 +249,9 @@ autoplot(close_price_Test)+ #test the future 3 years
   ylab("Traded in Saudi Riyal")
 ```
 
-* The darker and light darker areas, representing 80% and 95% confidence intervals respectively in lower and upper scenarios.
+*The forecasts are shown as a blue line, with the 80% prediction intervals as a dark shaded area, and the 95% prediction intervals as a light shaded area.
+
+*This is the overall process by which we can analyze time series data and forecast values from existing series using ARIMA.
 ```{r}
 #Dataset forecast lower first 5 values AND upper
 head(price_forecast$lower)
@@ -196,7 +267,7 @@ test  = close_price[(n+1):N]
 trainarimafit <- auto.arima(train, lambda = "auto")
 predlen=length(test)
 trainarimafit <- forecast(trainarimafit, h=predlen)
-accuracy(trainarimafit,test)
+ 
 ```
 
 
@@ -233,7 +304,9 @@ $y(t)=g(t)+s(t)+h(t)+ϵ$
 \
 \
 
+
 * The fist step before forecasting using prophet is to convert the dataset into the format that Prophet input requires.
+* Prophet expects input data to have 2 columns, ds and y.
 ```{r}
 N = length(dates)
 n = 0.3*N
