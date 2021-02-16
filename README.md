@@ -26,12 +26,12 @@
 The first step in time series data modeling using R is to convert the available data into time series data format using ts() function. 
 
 ###### Importnant elements of a time series data 
-*Trend: A long-term change in the data is referred to as a trend. 
+1. Trend: A long-term change in the data is referred to as a trend. 
 
-*Seasonal: When a series is affected by some seasonal factors.
-** To remove seasonality from the data, we subtract the seasonal component from the  data..
+2. Seasonal: When a series is affected by some seasonal factors.
+(to remove seasonality from the data, we subtract the seasonal component from the  data)
 
-*Cyclic: When data exhibit rises and falls that are not seasonal
+3. Cyclic: When data exhibit rises and falls that are not seasonal
 
 ###### Data Cleaning 
 * Dividing the data into  the first 7 years of the data going from 2010 - 2017, and leave the last 3 years (2017-2020) to compare the out come. The data will be divided 70/30.
